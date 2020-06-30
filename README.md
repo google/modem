@@ -13,6 +13,5 @@ MoDeM hopes to provide the **last-mile engineering infrastructure** that enables
 2. **Python ML models** with Google AI Platform (scikit-learn, XGBoost & Tensorflow) using Compute Engine - [here](https://github.com/google/modem/blob/master/pythonML/README.md)
 3. **AutoML models** using Compute Engine and/or AI Pipelines<sup>*</sup>.
 
-~~~
 
 <sup>*</sup>*On the roadmap.*
