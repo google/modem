@@ -18,4 +18,4 @@
 
 cron_schedule="* * * * *"
 echo "$cron_schedule cd ~/modem/pythonML/pipeline && python main.py >> workflow.csv" | crontab -
-echo "Your workflow has been schedule with the cron schedule of $cron_schedule. Enjoy!" 
+echo "Your workflow has been schedule with the cron schedule of $cron_schedule. Enjoy!"

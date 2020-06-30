@@ -12,19 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Pipeline code for PythonML activation to GA."""
 
+import datetime
+import warnings
 from googleapiclient import discovery
 from googleapiclient.http import MediaFileUpload
-from google.cloud import bigquery
-from oauth2client.service_account import ServiceAccountCredentials
-from google.oauth2 import service_account
-import datetime
 import httplib2
-import pandas as pd
 import numpy as np
+from oauth2client.service_account import ServiceAccountCredentials
 import params
-import os
-import warnings
+from google.cloud import bigquery
+
 
 GA_ACCOUNT_ID = params.GA_ACCOUNT_ID
 GA_PROPERTY_ID = params.GA_PROPERTY_ID
@@ -41,16 +40,20 @@ CSV_COLUMN_MAP = params.COLUMN_MAP
 SERVICE_ACCOUNT_FILE = "svc_key.json"
 CLOUD_SCOPES = ["https://www.googleapis.com/auth/cloud-platform"]
 CSV_LOCATION = "output.csv"
-GA_SCOPES = ['https://www.googleapis.com/auth/analytics.readonly',
-             'https://www.googleapis.com/auth/analytics.edit',
-             'https://www.googleapis.com/auth/analytics']
-GA_API_NAME = 'analytics'
-GA_API_VERSION = 'v3'
+GA_SCOPES = [
+    "https://www.googleapis.com/auth/analytics.readonly",
+    "https://www.googleapis.com/auth/analytics.edit",
+    "https://www.googleapis.com/auth/analytics"
+]
+GA_API_NAME = "analytics"
+GA_API_VERSION = "v3"
 
-warnings.simplefilter(action='ignore', category=FutureWarning)
+warnings.simplefilter(action="ignore", category=FutureWarning)
+
 
 def authorize_ga_api():
   """Fetches the GA API obj.
+
   Returns:
     ga_api: GA API obj.
   """
@@ -60,9 +63,10 @@ def authorize_ga_api():
   ga_api = discovery.build(GA_API_NAME, GA_API_VERSION, http=http)
   return ga_api
 
-  
+
 def read_new_data_from_bq():
   """Reads the prediction query from Bigquery using BQML.
+
   Returns:
     dataframe: BQML model results dataframe.
   """
@@ -75,9 +79,10 @@ def read_new_data_from_bq():
   dataframe = results.to_dataframe()
   return dataframe
 
-  
+
 def preprocess_features(df):
   """Preprocesses model input columns.
+
   Args:
     df: dataframe of input dataset, read from BQ.
   Returns:
@@ -88,85 +93,92 @@ def preprocess_features(df):
   # The design principle to keep in mind is to always
   # add columns to the output dataframe,
   # even for intermediate outputs if necessary.
-  # -------- Additional lines start here -------- 
-  # -------- Additional lines end here ---------- 
-  selected_df = df[BQ_PREDICTION_FEATURES] 
+  # -------- Additional lines start here --------
+  # -------- Additional lines end here ----------
+  selected_df = df[BQ_PREDICTION_FEATURES]
   features = selected_df.values.tolist()
   if np.array(features).shape == 1:
     features = [[f] for f in features]
   return features, df
 
-  
+
 def predict_using_ai_platform(feature_batch):
-  """Fetches model predictions from AI Platform model. 
+  """Fetches model predictions from AI Platform model.
+
   Args:
     feature_batch: features in one batch.
   Returns:
     predictions: model predictions or error.
   """
   ai_platform = discovery.build("ml", "v1")
-  name = 'projects/{}/models/{}/versions/{}'.format(GCP_PROJECT,
+  name = "projects/{}/models/{}/versions/{}".format(GCP_PROJECT,
                                                     AI_PLATFORM_MODEL_NAME,
                                                     AI_PLATFORM_VERSION_NAME)
-  response = ai_platform.projects().predict(name=name,
-                                            body={'instances':
-                                                  feature_batch}).execute()
-  if 'error' in response:
-      return ['error']*len(feature_batch)     
-  return response['predictions']
+  response = ai_platform.projects().predict(
+      name=name, body={
+          "instances": feature_batch
+      }).execute()
+  if "error" in response:
+    return ["error"] * len(feature_batch)
+  return response["predictions"]
+
 
 def predict_model_output(features, dataframe):
-  """Batches input features and fetches model predictions. 
+  """Batches input features and fetches model predictions.
+
   Args:
     features: pre-processed model input columns.
     dataframe: dataframe of input dataset, read from BQ.
   Returns:
     dataframe: appended dataframe with the predictions.
   """
-  BATCH_SIZE = 2000
+  batch_size = 2000
   predictions = []
-  for batch_start_row in range(0, len(features), BATCH_SIZE):
-    feature_batch = features[batch_start_row:batch_start_row+BATCH_SIZE]
+  for batch_start_row in range(0, len(features), batch_size):
+    feature_batch = features[batch_start_row:batch_start_row+batch_size]
     feature_predictions = predict_using_ai_platform(feature_batch)
     predictions = predictions + feature_predictions
-  dataframe['predicted'] = predictions
-  dataframe = dataframe[dataframe['predicted'] != 'error']
+  dataframe["predicted"] = predictions
+  dataframe = dataframe[dataframe["predicted"] != "error"]
   return dataframe
-  
+
+
 def postprocess_output(df):
   """Post-process model predictions.
+
   Args:
     df: dataframe appended with predictions - ('predicted' column)
   Returns:
-    df: dataframe with relevant & processed columns for GA import. 
+    df: dataframe with relevant & processed columns for GA import.
   """
-  predictions = df['predicted']
-  # TODO(developer): If needed, add postprocessing logic. 
+  predictions = df["predicted"]
+  # TODO(developer): If needed, add postprocessing logic.
   # Mostly necessary if using custom prediction routine.
   # The design principle to keep in mind is to always
   # add columns to the output dataframe,
   # even for intermediate outputs if necessary.
-  # -------- Additional lines start here -------- 
-  # -------- Additional lines end here ----------  
+  # -------- Additional lines start here --------
+  # -------- Additional lines end here ----------
   final_cols = list(CSV_COLUMN_MAP.keys())
   df = df[final_cols]
   df.columns = [CSV_COLUMN_MAP[bq_col_header] for bq_col_header in final_cols]
   return df
- 
+
 
 def prepare_csv(df):
   """Converts results dataframe to CSV.
-  
+
   Args:
     df: final results dataframe for GA export.
   """
   csv_string = df.to_csv(index=False)
   with open(CSV_LOCATION, "w+") as f:
-      f.write(csv_string)
+    f.write(csv_string)
 
 
 def write_to_ga_via_di(ga_api):
   """Write the prediction results into GA via data import.
+
   Args:
     ga_api: Google Analytics Management API object.
   """
@@ -178,9 +190,11 @@ def write_to_ga_via_di(ga_api):
       webPropertyId=GA_PROPERTY_ID,
       customDataSourceId=GA_DATASET_ID,
       media_body=media).execute()
-    
+
+
 def delete_ga_prev_uploads(ga_api):
   """Delete previous GA data import files.
+
   Args:
     ga_api: Google Analytics Management API object.
   """
@@ -200,20 +214,20 @@ def delete_ga_prev_uploads(ga_api):
 
 def write_to_ga_via_mp(df):
   """Write the prediction results into GA via Measurement Protocol.
+
   Args:
     df: BQML model results dataframe
   """
   pass
 
-    
+
 def main():
   """Code to trigger workflow.
   """
   timestamp_utc = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
   try:
     dataframe = read_new_data_from_bq()
-    features, dataframe =  preprocess_features(dataframe)
-    #df = predict_using_ai_platform(features, dataframe)
+    features, dataframe = preprocess_features(dataframe)
     df = predict_model_output(features, dataframe)
     output_df = postprocess_output(df)
     prepare_csv(output_df)
@@ -227,7 +241,7 @@ def main():
       raise Exception("GA Import method not found.")
     print("{0},SUCCESS".format(timestamp_utc))
   except Exception as e:
-    print("{0},ERROR,{1}".format(timestamp_utc,str(e)))
+    print("{0},ERROR,{1}".format(timestamp_utc, str(e)))
 
 
 main()

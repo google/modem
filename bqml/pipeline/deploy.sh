@@ -17,7 +17,7 @@
 #
 
 echo "~~~~~~~~ Welcome ~~~~~~~~~~"
-echo "Thanks for using BQML modem deployment." 
+echo "Thanks for using BQML modem deployment."
 echo "---------------------------"
 read -p "Please enter your GCP PROJECT ID: " project_id
 echo "---------------------------"

@@ -27,7 +27,6 @@ from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 
 from google.cloud import bigquery
-from google.oauth2 import service_account
 
 GA_ACCOUNT_ID = params.GA_ACCOUNT_ID
 GA_PROPERTY_ID = params.GA_PROPERTY_ID
@@ -62,7 +61,7 @@ CLOUD_SCOPES = ["https://www.googleapis.com/auth/cloud-platform"]
 
 def authorize_ga_api():
   """Fetches the GA API obj.
-  
+
   Returns:
     ga_api: GA API obj.
   """
@@ -75,7 +74,7 @@ def authorize_ga_api():
 
 def read_from_bq():
   """Reads the prediction query from Bigquery using BQML.
-  
+
   Returns:
     dataframe: BQML model results dataframe.
   """
@@ -92,14 +91,14 @@ def read_from_bq():
 
 def write_df_to_csv(df):
   """Converts BQML model results to CSV.
-  
+
   Args:
     df: final results dataframe for GA export.
   """
   csv_string = df.to_csv(index=False)
   with open(CSV_LOCATION, "w+") as f:
     f.write(csv_string)
-    
+
 
 def write_to_ga_via_di(ga_api):
   """Write the prediction results into GA via data import.
@@ -136,6 +135,7 @@ def delete_ga_prev_uploads(ga_api):
       customDataSourceId=GA_DATASET_ID,
       body=delete_request_body).execute()
 
+
 def write_to_ga_via_mp(df):
   """Write the prediction results into GA via Measurement Protocol.
 
@@ -143,7 +143,8 @@ def write_to_ga_via_mp(df):
     df: BQML model results dataframe
   """
   pass
-  
+
+
 # Retry 2^x * 1000 milliseconds between each retry, up to 10 seconds
 # ,then 10 seconds afterwards - for 5 attempts
 @retry(stop_max_attempt_number=5,
@@ -218,8 +219,8 @@ def trigger_workflow(request):
       write_to_bq_logs(status="ERROR", message=str(e))
     if ENABLED_EMAIL:
       send_email(error_message=str(e))
-    message = "{0},ERROR,{1}".format(timestamp_utc,str(e))
+    message = "{0},ERROR,{1}".format(timestamp_utc, str(e))
     return message
 
-  
+
 print(trigger_workflow(request=None))
