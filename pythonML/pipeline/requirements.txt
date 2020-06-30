@@ -1,0 +1,7 @@
+google-cloud-bigquery
+google-auth
+oauth2client
+pandas
+numpy
+httplib2
+google-api-python-client

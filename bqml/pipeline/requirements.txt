@@ -1,0 +1,9 @@
+google-cloud-bigquery
+google-auth
+oauth2client
+pandas
+httplib2
+google-api-python-client
+sendgrid
+retrying
+starkbank-ecdsa
