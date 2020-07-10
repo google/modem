@@ -6,4 +6,6 @@ httplib2
 google-api-python-client
 sendgrid
 retrying
+requests
 starkbank-ecdsa
+urllib

@@ -16,12 +16,14 @@
 """
 
 import datetime
+import urllib
 
 from googleapiclient import discovery
 from googleapiclient.http import MediaFileUpload
 import httplib2
 from oauth2client.service_account import ServiceAccountCredentials
 import params
+import requests
 from retrying import retry
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
@@ -33,6 +35,7 @@ GA_PROPERTY_ID = params.GA_PROPERTY_ID
 GA_DATASET_ID = params.GA_DATASET_ID
 GA_IMPORT_METHOD = params.GA_IMPORT_METHOD
 BQML_PREDICT_QUERY = params.BQML_PREDICT_QUERY
+GA_MP_STANDARD_HIT_DETAILS = params.GA_MP_STANDARD_HIT_DETAILS
 
 ENABLED_LOGGING = params.ENABLE_BQ_LOGGING
 ENABLED_EMAIL = params.ENABLE_SENDGRID_EMAIL_REPORTING
@@ -49,6 +52,8 @@ HTML_CONTENT = params.HTML_CONTENT
 
 SERVICE_ACCOUNT_FILE = "svc_key.json"
 CSV_LOCATION = "/tmp/data.csv"
+
+GA_MP_ENDPOINT = "https://www.google-analytics.com/batch"
 
 GA_SCOPES = ["https://www.googleapis.com/auth/analytics.readonly",
              "https://www.googleapis.com/auth/analytics.edit",
@@ -78,14 +83,16 @@ def read_from_bq():
   Returns:
     dataframe: BQML model results dataframe.
   """
+
   bq_client = bigquery.Client()
   query_job = bq_client.query(BQML_PREDICT_QUERY)
   results = query_job.result()
   dataframe = results.to_dataframe()
-  # assumes columns in BQ are named as ga_<name> e.g. ga_clientId, ga_dimension1
-  # converts them to ga:clientId, ga:dimension1
-  dataframe.columns = [col_name.replace("_", ":")
-                       for col_name in dataframe.columns.values]
+  if GA_IMPORT_METHOD == "di":
+    # assumes columns in BQ are named as ga_<name> e.g. ga_dimension1
+    # converts them to ga:clientId, ga:dimension1
+    dataframe.columns = [col_name.replace("_", ":")
+                         for col_name in dataframe.columns.values]
   return dataframe
 
 
@@ -136,13 +143,100 @@ def delete_ga_prev_uploads(ga_api):
       body=delete_request_body).execute()
 
 
+def send_mp_hit(payload_send, success_requests, failed_requests):
+  """Send hit to Measurement Protocol endpoint.
+
+  Args:
+      payload_send: Measurement Protocol hit package to send
+      success_requests: list of successful batch requests to GA
+      failed_requests:  list of failed batch requests to GA
+  Returns:
+      boolean
+  """
+
+  # Submit a POST request to Measurement Protocol endpoint
+  prepared = requests.Request("POST",
+                              GA_MP_ENDPOINT,
+                              data=payload_send).prepare()
+  print("Sending measurement protcol request to url " + prepared.url)
+
+  response = requests.Session().send(prepared)
+
+  if response.status_code not in range(200, 299):
+    print("Measurement Protocol submission unsuccessful status code: " +
+          str(response.status_code))
+    failed_requests.append(payload_send)
+    return success_requests, failed_requests
+
+  print("Measurement Protocol submission status code: " +
+        str(response.status_code))
+  success_requests.append(payload_send)
+  return success_requests, failed_requests
+
+
+def prepare_payloads_for_batch_request(payloads):
+  """Merges payloads to send them in a batch request.
+
+  Args:
+    payloads: list of payload, each payload being a dictionary.
+
+  Returns:
+    concatenated url-encoded payloads. For example:
+        param1=value10&param2=value20
+        param1=value11&param2=value21
+  """
+  assert isinstance(payloads, list) or isinstance(payloads, tuple)
+  payloads_utf8 = [sorted([(k, str(p[k]).encode("utf-8")) for k in p],
+                          key=lambda t: t[0]) for p in payloads]
+  return "\n".join(map(lambda p: urllib.parse.urlencode(p), payloads_utf8))
+
+
 def write_to_ga_via_mp(df):
   """Write the prediction results into GA via Measurement Protocol.
 
   Args:
     df: BQML model results dataframe
   """
-  pass
+  i = 0
+  success_requests, failed_requests, payload_list = list(), list(), list()
+
+  for row_index, bq_results_row in df.iterrows():
+    i += 1
+    hit_data = {}
+    for (ga_key, value) in GA_MP_STANDARD_HIT_DETAILS.items():
+      if value:
+        hit_data[ga_key] = value
+
+    # add additional information from BQ
+    for (column_name, column_value) in bq_results_row.iteritems():
+      hit_data[column_name] = column_value
+
+    payload_list.append(hit_data)
+
+    if i%20 == 0:
+      # batch the hits up
+      payload_send = prepare_payloads_for_batch_request(payload_list)
+      print("Payload to send: " + payload_send)
+      success_requests, failed_requests = send_mp_hit(payload_send,
+                                                      success_requests,
+                                                      failed_requests)
+      payload_list = list()
+      i = 0
+
+  # Issue last batch call
+  if i > 0:
+    print("Sending remaining items to GA")
+    payload_send = prepare_payloads_for_batch_request(payload_list)
+    print("Payload to send: " + payload_send)
+    success_requests, failed_requests = send_mp_hit(payload_send,
+                                                    success_requests,
+                                                    failed_requests)
+
+  print("Completed all GA calls. Total successful batches:  " +
+        str(len(success_requests)) + " and failed batches: " +
+        str(len(failed_requests)))
+  if failed_requests:
+    print("Failed request details: " + failed_requests)
 
 
 # Retry 2^x * 1000 milliseconds between each retry, up to 10 seconds

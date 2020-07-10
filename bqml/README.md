@@ -28,8 +28,20 @@
     service account email generated from the previous step, create a user within
     ***Admin > Account > Account User Management*** with **Edit, Read and
     Analyze permissions**.
-2.  **Setup GA:** Create the custom dimensions. **If using Data Import, setup
-    schema.**
+2.  **Setup GA:** Create the custom dimensions under the relevant property. **If
+    using Data Import** setup schema under the same property and keep hold of
+    the Data Set ID as the pipeline will need this.
+
+### BigQuery
+
+1.  **Column mapping:** The SELECT query will perform the mapping of the BQ
+    column name to the name referenced in GA. **If using Data Import** this
+    means the column mapping to ga:dimensionX e.g SELECT decile as
+    ga_dimension2. The pipeline will replace all "_" with ":" as BigQuery does
+    not allow ":" in column headers. **If using Measurement Protocol** this
+    means the column mapping to cd12 or any optional MP parameter found in the
+    [documentation](https://developers.google.com/analytics/devguides/collection/protocol/v1/parameters#user).
+    All mandatory parameters are configurable in the pipeline.
 
 ### Optional (for monitoring & logging)
 
@@ -86,8 +98,13 @@ Otherwise,
 
 3.  **Edit 'params.py' file:** with the correct Google Analytics account id,
     property id, and dataset id. Also, update the query parameter with the
-    BigQueryML predict query. ***Optionally***, you choose to enable monitoring
-    and email, see the instructions in params.py file.
+    BigQueryML predict query. **If using Measurement Protocol** update the
+    mandatory parameters: hit type, event category, event action and
+    non-iteraction hit.
+    [Documentation](https://developers.google.com/analytics/devguides/collection/protocol/v1/parameters#user)
+    can be found here for definitions of these fields. ***Optionally***, you
+    choose to enable monitoring and email, see the instructions in params.py
+    file.
 
 4.  **Edit 'scheduler.sh' file:** with JOB_NAME, SCHEDULE, TIMEZONE,
     FUNCTION_URL & SERVICE_ACCOUNT_EMAIL as specified and "Deploy" the function.

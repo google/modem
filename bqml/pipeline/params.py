@@ -16,15 +16,30 @@
 # ------------------------------------------------------------------
 
 # GA Details
-GA_ACCOUNT_ID = ""
-GA_PROPERTY_ID = ""
-GA_DATASET_ID = ""
-GA_IMPORT_METHOD = "di" # "di" - Data Import or "mp" - Measurement Protocol
+GA_ACCOUNT_ID = ""   # requierd for DI only
+GA_PROPERTY_ID = ""   # required for both DI and MP
+GA_DATASET_ID = ""   # required for DI only
+GA_IMPORT_METHOD = "di"   # "di" - Data Import or "mp" - Measurement Protocol
+
+# GA measurement protocol hit details. Add any additional fields which are
+# the same for all hits here.
+GA_MP_STANDARD_HIT_DETAILS = {
+    # mandatory fields below:
+    "tid": GA_PROPERTY_ID,  # ga property id - same as above
+    "v": 1, # MP API version
+    "t": "",  #  hit type
+    "ni": 1,   # non interaction hit: 1 or 0,
+    "ec": "",  # event category
+    "ea": "",  #  event action
+    # optional fields below:
+    "ds": "",  # data source
+    "ua": "modem",  # user agent override
+}
 
 # BQML Details -
-# Ensure that the BQ result headers resemble the data import schema
-# E.g. If data import schema looks like  - ga:clientId, ga:dimension1, etc.
-# BQ result headers should like ga_clientId, ga_dimension1, etc.
+# Ensure that the BQ result headers resemble the data import schema in SELECT
+# E.g. If data import schema looks like  - ga:dimension32, ga:dimension1, etc.
+# BQ result headers should like ga_client32, ga_dimension1, etc.
 BQML_PREDICT_QUERY = """
                      """
 

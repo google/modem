@@ -25,6 +25,15 @@ MoDeM hopes to provide the **last-mile engineering infrastructure** that enables
 analysts to **quickly productionize & activate their models** with the necessary
 operational and security rigor.
 
+## Prerequisites
+
+1.  **Client Id correctly captured in GA**. If using Data Import - any model
+    that is created using client id and the desire is to create remarketing
+    audiences based off the output of the query you need to ensure that clientId
+    is captured as a custom dimension in GA. The pipeline will point the
+    clientId field to the custom dimension and not the clientId for data import.
+    You also cannot use User-Id.
+
 ## Instructions
 
 1.  **BigQueryML models** using Cloud Functions & Cloud Scheduler / Compute
