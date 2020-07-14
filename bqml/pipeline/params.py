@@ -24,22 +24,24 @@ GA_IMPORT_METHOD = "di"   # "di" - Data Import or "mp" - Measurement Protocol
 # GA measurement protocol hit details. Add any additional fields which are
 # the same for all hits here.
 GA_MP_STANDARD_HIT_DETAILS = {
-    # mandatory fields below:
-    "tid": GA_PROPERTY_ID,  # ga property id - same as above
+    # mandatory fields below. Do not remove.
     "v": 1, # MP API version
+    "tid": GA_PROPERTY_ID,  # ga property id - same as above
     "t": "",  #  hit type
+    # optional fields below:
     "ni": 1,   # non interaction hit: 1 or 0,
     "ec": "",  # event category
     "ea": "",  #  event action
-    # optional fields below:
+    "el": "",  # event label
     "ds": "",  # data source
     "ua": "modem",  # user agent override
 }
 
-# BQML Details -
+
+# BigQuery Query Details - BQML query or normal BQ Query possible
 # Ensure that the BQ result headers resemble the data import schema in SELECT
 # E.g. If data import schema looks like  - ga:dimension32, ga:dimension1, etc.
-# BQ result headers should like ga_client32, ga_dimension1, etc.
+# BQ result headers should like SELECT X AS ga_dimension32, Y AS ga_dimension1
 BQML_PREDICT_QUERY = """
                      """
 

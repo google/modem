@@ -8,4 +8,3 @@ sendgrid
 retrying
 requests
 starkbank-ecdsa
-urllib

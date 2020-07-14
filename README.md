@@ -27,12 +27,12 @@ operational and security rigor.
 
 ## Prerequisites
 
-1.  **Client Id correctly captured in GA**. If using Data Import - any model
-    that is created using client id and the desire is to create remarketing
-    audiences based off the output of the query you need to ensure that clientId
-    is captured as a custom dimension in GA. The pipeline will point the
-    clientId field to the custom dimension and not the clientId for data import.
-    You also cannot use User-Id.
+1.  **Match Key for Data Import is a custom dimension in GA, eg: Client Id **.
+    If using Data Import - any model that is created using client id or user-id
+    and the desire is to create remarketing audiences based off the output of
+    the query you need to ensure that id is captured as a custom dimension in
+    GA. The pipeline will point the clientId or user-id field from the query to
+    the custom dimension in GA.
 
 ## Instructions
 

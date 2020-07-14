@@ -87,9 +87,7 @@ Otherwise,
     your function.
 
     ```
-    rm -rf modem && git clone
-    https://github.com/google/modem.git && cd modem/bqml/pipeline && sh
-    deploy.sh`
+    rm -rf modem && git clone https://github.com/google/modem.git && cd modem/bqml/pipeline && sh deploy.sh
     ```
 
 2.  **Edit 'svc_key.json' file:** Edit the created Cloud Function in the UI and
@@ -130,8 +128,7 @@ Otherwise,
 1.  **Clone the repo:** SSH into Compute Engine and enter the following command.
 
     ```
-    sudo apt-get install git rm -rf modem && git clone
-    https://github.com/google/modem.git && cd modem/bqml/pipeline
+    sudo apt-get install git rm -rf modem && git clone https://github.com/google/modem.git && cd modem/bqml/pipeline
     ```
 
 2.  **Edit 'svc_key.json' file:** Same as above (Step 2).
