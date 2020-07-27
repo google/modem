@@ -21,21 +21,19 @@ from googleapiclient.http import MediaFileUpload
 import httplib2
 import numpy as np
 from oauth2client.service_account import ServiceAccountCredentials
+from google.oauth2 import service_account
 import params
+import pandas as pd
 from google.cloud import bigquery
+import pkl_predictions  
 
 
 GA_ACCOUNT_ID = params.GA_ACCOUNT_ID
 GA_PROPERTY_ID = params.GA_PROPERTY_ID
 GA_DATASET_ID = params.GA_DATASET_ID
 GA_IMPORT_METHOD = params.GA_IMPORT_METHOD
-GCP_PROJECT = params.GCP_PROJECT
-BQ_DATASET_NEW_DATA = params.GA_BQ_DATASET_NAME
-BQ_TABLE_NEW_DATA = params.GA_BQ_TABLE_NAME
-AI_PLATFORM_MODEL_NAME = params.AI_PLATFORM_MODEL_NAME
-AI_PLATFORM_VERSION_NAME = params.AI_PLATFORM_VERSION_NAME
-BQ_PREDICTION_FEATURES = params.MODEL_INPUT_COL_NAMES
-CSV_COLUMN_MAP = params.COLUMN_MAP
+BQ_READ_QUERY = params.BQ_READ_QUERY
+MODEL_FILE_NAME = params.MODEL_FILE_NAME
 
 SERVICE_ACCOUNT_FILE = "svc_key.json"
 CLOUD_SCOPES = ["https://www.googleapis.com/auth/cloud-platform"]
@@ -64,105 +62,20 @@ def authorize_ga_api():
   return ga_api
 
 
-def read_new_data_from_bq():
+def read_from_bq():
   """Reads the prediction query from Bigquery using BQML.
 
   Returns:
     dataframe: BQML model results dataframe.
   """
-  client = bigquery.Client()
-  query = "SELECT * FROM `{0}.{1}.{2}`".format(GCP_PROJECT,
-                                               BQ_DATASET_NEW_DATA,
-                                               BQ_TABLE_NEW_DATA)
-  query_job = client.query(query)
+  credentials = service_account.Credentials.from_service_account_file(
+    SERVICE_ACCOUNT_FILE, scopes=["https://www.googleapis.com/auth/cloud-platform"])
+  bq_client = bigquery.Client(credentials=credentials, project=credentials.project_id)
+  #bq_client = bigquery.Client()
+  query_job = bq_client.query(BQ_READ_QUERY)
   results = query_job.result()
   dataframe = results.to_dataframe()
   return dataframe
-
-
-def preprocess_features(df):
-  """Preprocesses model input columns.
-
-  Args:
-    df: dataframe of input dataset, read from BQ.
-  Returns:
-    features: pre-processed model input columns.
-    df: dataframe of input dataset, read from BQ.
-  """
-  # TODO(developer): If needed, add preprocessing logic.
-  # The design principle to keep in mind is to always
-  # add columns to the output dataframe,
-  # even for intermediate outputs if necessary.
-  # -------- Additional lines start here --------
-  # -------- Additional lines end here ----------
-  selected_df = df[BQ_PREDICTION_FEATURES]
-  features = selected_df.values.tolist()
-  if np.array(features).shape == 1:
-    features = [[f] for f in features]
-  return features, df
-
-
-def predict_using_ai_platform(feature_batch):
-  """Fetches model predictions from AI Platform model.
-
-  Args:
-    feature_batch: features in one batch.
-  Returns:
-    predictions: model predictions or error.
-  """
-  ai_platform = discovery.build("ml", "v1")
-  name = "projects/{}/models/{}/versions/{}".format(GCP_PROJECT,
-                                                    AI_PLATFORM_MODEL_NAME,
-                                                    AI_PLATFORM_VERSION_NAME)
-  response = ai_platform.projects().predict(
-      name=name, body={
-          "instances": feature_batch
-      }).execute()
-  if "error" in response:
-    return ["error"] * len(feature_batch)
-  return response["predictions"]
-
-
-def predict_model_output(features, dataframe):
-  """Batches input features and fetches model predictions.
-
-  Args:
-    features: pre-processed model input columns.
-    dataframe: dataframe of input dataset, read from BQ.
-  Returns:
-    dataframe: appended dataframe with the predictions.
-  """
-  batch_size = 2000
-  predictions = []
-  for batch_start_row in range(0, len(features), batch_size):
-    feature_batch = features[batch_start_row:batch_start_row+batch_size]
-    feature_predictions = predict_using_ai_platform(feature_batch)
-    predictions = predictions + feature_predictions
-  dataframe["predicted"] = predictions
-  dataframe = dataframe[dataframe["predicted"] != "error"]
-  return dataframe
-
-
-def postprocess_output(df):
-  """Post-process model predictions.
-
-  Args:
-    df: dataframe appended with predictions - ('predicted' column)
-  Returns:
-    df: dataframe with relevant & processed columns for GA import.
-  """
-  predictions = df["predicted"]
-  # TODO(developer): If needed, add postprocessing logic.
-  # Mostly necessary if using custom prediction routine.
-  # The design principle to keep in mind is to always
-  # add columns to the output dataframe,
-  # even for intermediate outputs if necessary.
-  # -------- Additional lines start here --------
-  # -------- Additional lines end here ----------
-  final_cols = list(CSV_COLUMN_MAP.keys())
-  df = df[final_cols]
-  df.columns = [CSV_COLUMN_MAP[bq_col_header] for bq_col_header in final_cols]
-  return df
 
 
 def prepare_csv(df):
@@ -212,29 +125,25 @@ def delete_ga_prev_uploads(ga_api):
       body=delete_request_body).execute()
 
 
-def write_to_ga_via_mp(df):
-  """Write the prediction results into GA via Measurement Protocol.
-
-  Args:
-    df: BQML model results dataframe
-  """
-  pass
-
-
 def main():
   """Code to trigger workflow.
   """
   timestamp_utc = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
   try:
-    dataframe = read_new_data_from_bq()
-    features, dataframe = preprocess_features(dataframe)
-    df = predict_model_output(features, dataframe)
-    output_df = postprocess_output(df)
-    prepare_csv(output_df)
+    dataframe = read_from_bq()
+    print("Read the input data from BQ.")
+    processed_df = pkl_predictions.preprocess(dataframe)
+    print("Pre-processed the input data.")
+    results_df = pkl_predictions.get_predictions(MODEL_FILE_NAME,
+                                                 processed_df)
+    print("Fetched prediction results.")
     if GA_IMPORT_METHOD == "di":
+      print("Uploading to GA via DI.....")
+      prepare_csv(results_df)
       ga_api = authorize_ga_api()
       write_to_ga_via_di(ga_api)
       delete_ga_prev_uploads(ga_api)
+      print("Upload via DI complete.")
     elif GA_IMPORT_METHOD == "mp":
       write_to_ga_via_mp(output_df)
     else:
