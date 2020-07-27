@@ -128,7 +128,6 @@ def delete_ga_prev_uploads(ga_api):
 def main():
   """Code to trigger workflow.
   """
-  timestamp_utc = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
   try:
     dataframe = read_from_bq()
     print("Read the input data from BQ.")
@@ -148,8 +147,10 @@ def main():
       write_to_ga_via_mp(output_df)
     else:
       raise Exception("GA Import method not found.")
+    timestamp_utc = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     print("{0},SUCCESS".format(timestamp_utc))
   except Exception as e:
+    timestamp_utc = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     print("{0},ERROR,{1}".format(timestamp_utc, str(e)))
 
 
