@@ -8,3 +8,4 @@ sendgrid
 retrying
 requests
 starkbank-ecdsa
+pyarrow
